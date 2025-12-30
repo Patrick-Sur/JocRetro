@@ -8,9 +8,20 @@
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
+// --- PINI ---
 const int BTN_LEFT = 4;
 const int BTN_RIGHT = 5;
 const int BTN_ROTATE = 6;
+
+
+
+// --- STATE MACHINE ---
+enum SystemState { STATE_MENU, STATE_PLAYING, STATE_GAMEOVER };
+SystemState currentState = STATE_MENU;
+
+bool selectedGameIsTetris = true; // true = Tetris, false = NFS
+
+
 
 // dimensiune ecran 64x128 - vom folosi 60x120
 const int BLOCK_SIZE = 6; // 6 pixeli per patratel (10x6 = 60px latime)
@@ -19,12 +30,15 @@ const int BOARD_H = 20;   // 20x6 = 120px inaltime (incape perfect in 128)
 
 int board[BOARD_H][BOARD_W] = {0};
 
+
+
 // Variabile stare
 long score = 0;
-bool gameOver = false;
 int currentX, currentY, currentType;
 unsigned long lastMoveTime = 0;
 int gameSpeed = 300;
+
+
 
 // Formele pieselor (7 tipuri)
 const byte shapes[7][4][4] = {
@@ -38,6 +52,13 @@ const byte shapes[7][4][4] = {
 };
 byte piece[4][4];
 
+const byte car[4][3] = {
+  {0,1,0},{1,1,1},{0,1,0},{1,1,1}
+};
+
+
+
+// --- SETUP ---
 void setup() {
   Serial.begin(9600);
   randomSeed(analogRead(A0));
@@ -55,19 +76,130 @@ void setup() {
   // 1 = 90 grade (Portret). Acum coordonatele X merg pana la 64, Y pana la 128
   display.setRotation(1); 
   
-  resetGame();
+  resetTetris();
 }
 
+
+
+// --- LOOP + MENIU ---
 void loop() {
-  // daca jocul este gata si se apasa pe butonul de rotire atunci se reincepe jocul
-  if (gameOver) {
-    showGameOver();
-    if (digitalRead(BTN_ROTATE) == LOW) {
-      resetGame();
-      delay(500);
-    }
-    return;
+  switch (currentState) {
+    case STATE_MENU:
+      runMenuLogic();
+      break;
+      
+    case STATE_PLAYING:
+      if (selectedGameIsTetris) {
+        runTetrisGame();
+      } else {
+        runNFSGame();
+      }
+      break;
+      
+    case STATE_GAMEOVER:
+      showGameOver();
+      break;
   }
+}
+
+void runMenuLogic() {
+  // initializare meniu
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  
+  // titlu
+  display.setCursor(5, 10);
+  display.println(F("ALEGE JOC:"));
+  display.drawLine(0, 20, 64, 20, SSD1306_WHITE);
+
+  // optiunea 1: TETRIS
+  if (selectedGameIsTetris) {
+    display.fillRect(0, 40, 64, 14, SSD1306_WHITE); // Highlight
+    display.setTextColor(SSD1306_BLACK);
+    display.setCursor(5, 43);
+    display.println(F("> TETRIS"));
+  } else {
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(5, 43);
+    display.println(F("  TETRIS"));
+  }
+
+  // optiunea 2: NFS
+  if (!selectedGameIsTetris) {
+    display.fillRect(0, 60, 64, 14, SSD1306_WHITE); // Highlight
+    display.setTextColor(SSD1306_BLACK);
+    display.setCursor(5, 63);
+    display.println(F("> NFS"));
+  } else {
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(5, 63);
+    display.println(F("  NFS"));
+  }
+
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 90);
+  display.println(F("Stg/Dr:"));
+  display.println(F("Alege"));
+  display.println(F("Rotire:"));
+  display.println(F("Start"));
+
+  display.display();
+
+  // input Meniu
+  if (digitalRead(BTN_LEFT) == LOW) {
+    selectedGameIsTetris = true;
+    delay(150);
+  }
+  if (digitalRead(BTN_RIGHT) == LOW) {
+    selectedGameIsTetris = false;
+    delay(150);
+  }
+  if (digitalRead(BTN_ROTATE) == LOW) {
+    if (selectedGameIsTetris) resetTetris();
+      else resetNFS();
+    
+    currentState = STATE_PLAYING;
+    delay(300);
+  }
+}
+
+
+
+// --- FUNCTII NFS ---
+void runNFSGame(){
+  display.clearDisplay();
+  
+  // Desenare cadru (Offset 1 pixel ca sa arate bine)
+  int offsetX = 2; 
+  int offsetY = 2;
+  currentX = 3;
+  currentY = 15;
+
+  // bordura
+  display.drawRect(0, 0, BOARD_W * BLOCK_SIZE + 4, BOARD_H * BLOCK_SIZE + 4, SSD1306_WHITE);
+  
+  // masina
+  for (int y = 0; y < 4; y++) {
+    for (int x = 0; x < 3; x++) {
+      if (car[y][x])
+         display.fillRect(offsetX + (currentX + x) * BLOCK_SIZE, offsetY + (currentY + y) * BLOCK_SIZE, BLOCK_SIZE-1, BLOCK_SIZE-1, SSD1306_WHITE);
+    }
+  }
+  display.display();
+}
+
+// curatam tabla
+void resetNFS() {
+  memset(board, 0, sizeof(board));
+  score = 0;
+  gameSpeed = 300;
+}
+
+
+
+// --- FUNCTII TETRIS ---
+void runTetrisGame() {
 
   // se citeste inputul de la butoane
   if (digitalRead(BTN_LEFT) == LOW) { movePiece(-1, 0); delay(100); }
@@ -84,22 +216,20 @@ void loop() {
       
       // verificam daca noua piesa are loc iar in caz negativ semnalam ca jocul se termina
       if (!isValid(0, 0)) {
-         gameOver = true;
+         currentState = STATE_GAMEOVER;
       }
     }
     lastMoveTime = millis();
   }
 
   // desenam tabla de joc
-  drawGame();
+  drawTetris();
 }
 
-
 // curatam tabla
-void resetGame() {
+void resetTetris() {
   memset(board, 0, sizeof(board));
   score = 0;
-  gameOver = false;
   gameSpeed = 300;
   newPiece();
 }
@@ -181,7 +311,7 @@ void checkLines() {
 }
 
 // --- DESENARE ---
-void drawGame() {
+void drawTetris() {
   display.clearDisplay();
   
   // Desenare cadru (Offset 1 pixel ca sa arate bine)
@@ -214,25 +344,32 @@ void drawGame() {
   display.display();
 }
 
+
+
+// --- AFISARE SFARSIT JOC ---
 void showGameOver() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
   
-  display.setCursor(5, 30);
+  display.setCursor(10, 30);
   display.println(F("GAME OVER"));
   
-  display.setCursor(5, 40);
+  display.setCursor(10, 50);
   display.print(F("Scor: "));
   display.println(score);
   
-  display.setCursor(17, 80);
+  display.setCursor(17, 90);
   display.println(F("Apasa"));
-  display.setCursor(1, 90);
-  display.println(F("BTN ROTIRE"));
-
-  display.setCursor(3, 110);
-  display.println(F("pt restart"));
+  display.setCursor(17, 100);
+  display.println(F("ROTIRE"));
+  display.setCursor(10, 110);
+  display.println(F("ptr MENIU"));
   
   display.display();
+
+  if (digitalRead(BTN_ROTATE) == LOW) {
+    currentState = STATE_MENU;
+    delay(500);
+  }
 }
