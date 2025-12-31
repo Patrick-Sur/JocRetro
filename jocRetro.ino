@@ -180,6 +180,25 @@ void runMenuLogic() {
 
 
 // --- FUNCTII NFS ---
+bool wallColision(int offsetX, int offsetY) {
+  for (int y = 0; y < 4; y++) {
+    for (int x = 0; x < 3; x++) {
+      if (car[y][x]) {
+        int screenX = x + offsetX;
+        int screenY = y + offsetY;
+        
+        if (screenX < 0 || screenX >= 10)
+          return true;
+
+        int mapY = (screenY + 30 - mapOffset) % 30;
+        if (NFSmap[mapY][screenX] == 1)
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 void runNFSGame(){
   if (digitalRead(BTN_LEFT) == LOW) { 
     if (currentX > 2) 
@@ -205,8 +224,7 @@ void runNFSGame(){
     if (mapOffset >= 30)
       mapOffset = 0;
     // verificam daca nu am facut accident
-    if (NFSmap[(currentY + mapOffset) % 30][currentX] == 1 || 
-           NFSmap[(currentY + mapOffset) % 30][currentX + 2] == 1) {
+    if (wallColision(currentX, currentY) == true) {
           currentState = STATE_GAMEOVER; 
        }
     lastMoveTime = millis();
@@ -239,7 +257,7 @@ void drawNFS() {
   
   //harta
   for (int y = 0; y < BOARD_H; y++) {
-    int mapY = (y + 30 - mapOffset) % 30; // sau (y + mapOffset) % 30 depinde de directie
+    int mapY = (y + 30 - mapOffset) % 30;
     
     for (int x = 0; x < 10; x++) {
       if (NFSmap[mapY][x] == 1) {
