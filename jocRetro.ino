@@ -56,6 +56,21 @@ const byte car[4][3] = {
   {0,1,0},{1,1,1},{0,1,0},{1,1,1}
 };
 
+int mapOffset = 0;
+const byte NFSmap[30][10] = {
+  {1,1,0,0,0,0,0,0,1,1}, {1,1,1,0,0,0,0,1,1,1}, {1,1,1,0,0,0,0,1,1,1},
+  {1,1,0,0,0,0,0,0,1,1}, {1,1,0,0,0,0,0,0,1,1}, {1,1,0,0,0,0,0,0,1,1},
+  {1,1,0,0,0,0,0,0,1,1}, {1,1,0,0,0,0,0,0,1,1}, {1,1,1,0,0,0,0,1,1,1},
+  {1,1,1,0,0,0,0,0,1,1}, {1,1,1,0,0,0,0,0,1,1}, {1,1,1,0,0,0,0,0,1,1},
+  {1,1,1,0,0,0,0,0,1,1}, {1,1,1,0,0,0,0,0,1,1}, {1,1,1,0,0,0,0,0,1,1},
+  {1,1,1,0,0,0,0,0,1,1}, {1,1,0,0,0,0,0,0,1,1}, {1,1,0,0,0,0,0,0,1,1},
+  {1,1,0,0,0,0,0,0,1,1}, {1,1,0,0,0,0,0,0,1,1}, {1,1,1,0,0,0,0,0,1,1},
+  {1,1,1,1,0,0,0,0,1,1}, {1,1,1,1,0,0,0,0,1,1}, {1,1,1,1,0,0,0,0,1,1},
+  {1,1,1,1,0,0,0,0,1,1}, {1,1,1,1,0,0,0,0,1,1}, {1,1,1,0,0,0,0,1,1,1},
+  {1,1,1,0,0,0,0,1,1,1}, {1,1,1,0,0,0,0,1,1,1}, {1,1,0,0,0,0,0,0,1,1}
+};
+
+
 
 
 // --- SETUP ---
@@ -75,8 +90,6 @@ void setup() {
 
   // 1 = 90 grade (Portret). Acum coordonatele X merg pana la 64, Y pana la 128
   display.setRotation(1); 
-  
-  resetTetris();
 }
 
 
@@ -168,17 +181,73 @@ void runMenuLogic() {
 
 // --- FUNCTII NFS ---
 void runNFSGame(){
+  if (digitalRead(BTN_LEFT) == LOW) { 
+    if (currentX > 2) 
+      currentX--; 
+    delay(100); 
+  }
+  if (digitalRead(BTN_RIGHT) == LOW) { 
+    if (currentX < 5) 
+      currentX++; 
+    delay(100); 
+  }
+
+
+  if (digitalRead(BTN_ROTATE) == LOW)
+    gameSpeed = 100;
+  else
+    gameSpeed = 300;
+  
+
+  if (millis() - lastMoveTime > gameSpeed) {
+    score+=10;
+    mapOffset++;
+    if (mapOffset >= 30)
+      mapOffset = 0;
+    // verificam daca nu am facut accident
+    if (NFSmap[(currentY + mapOffset) % 30][currentX] == 1 || 
+           NFSmap[(currentY + mapOffset) % 30][currentX + 2] == 1) {
+          currentState = STATE_GAMEOVER; 
+       }
+    lastMoveTime = millis();
+  }
+
+  // desenam tabla de joc
+  drawNFS();
+}
+
+// curatam tabla
+void resetNFS() {
+  memset(board, 0, sizeof(board));
+  score = 0;
+  gameSpeed = 300;
+  mapOffset = 0;
+
+  currentX = 3;
+  currentY = 15;
+}
+
+void drawNFS() {
   display.clearDisplay();
   
   // Desenare cadru (Offset 1 pixel ca sa arate bine)
   int offsetX = 2; 
   int offsetY = 2;
-  currentX = 3;
-  currentY = 15;
 
   // bordura
   display.drawRect(0, 0, BOARD_W * BLOCK_SIZE + 4, BOARD_H * BLOCK_SIZE + 4, SSD1306_WHITE);
   
+  //harta
+  for (int y = 0; y < BOARD_H; y++) {
+    int mapY = (y + 30 - mapOffset) % 30; // sau (y + mapOffset) % 30 depinde de directie
+    
+    for (int x = 0; x < 10; x++) {
+      if (NFSmap[mapY][x] == 1) {
+         display.fillRect(offsetX + x * BLOCK_SIZE, offsetY + y * BLOCK_SIZE, BLOCK_SIZE-1, BLOCK_SIZE-1, SSD1306_WHITE);
+      }
+    }
+  }
+
   // masina
   for (int y = 0; y < 4; y++) {
     for (int x = 0; x < 3; x++) {
@@ -187,13 +256,6 @@ void runNFSGame(){
     }
   }
   display.display();
-}
-
-// curatam tabla
-void resetNFS() {
-  memset(board, 0, sizeof(board));
-  score = 0;
-  gameSpeed = 300;
 }
 
 
