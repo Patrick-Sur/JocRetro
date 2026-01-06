@@ -203,13 +203,11 @@ bool wallColision(int offsetX, int offsetY) {
 
 void runNFSGame(){
   if (digitalRead(BTN_LEFT) == LOW) { 
-    if (currentX > 2) 
-      currentX--; 
+    currentX--; 
     delay(100); 
   }
   if (digitalRead(BTN_RIGHT) == LOW) { 
-    if (currentX < 5) 
-      currentX++; 
+    currentX++; 
     delay(100); 
   }
 
