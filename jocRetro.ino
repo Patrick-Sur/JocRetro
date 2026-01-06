@@ -20,6 +20,7 @@ enum SystemState { STATE_MENU, STATE_PLAYING, STATE_GAMEOVER };
 SystemState currentState = STATE_MENU;
 
 bool selectedGameIsTetris = true; // true = Tetris, false = NFS
+bool scoreSent = false;
 
 
 
@@ -75,7 +76,8 @@ const byte NFSmap[30][10] = {
 
 // --- SETUP ---
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
+  Serial1.begin(115200);
   randomSeed(analogRead(A0));
 
   pinMode(BTN_LEFT, INPUT_PULLUP);
@@ -427,6 +429,17 @@ void drawTetris() {
 
 
 // --- AFISARE SFARSIT JOC ---
+void trimiteScorLaESP(String numeJoc, long scorFinal) {
+  // Trimitem in formatul: "NUME:SCOR"
+  Serial1.print(numeJoc);
+  Serial1.print(":");
+  Serial1.println(scorFinal);
+
+  Serial.print(numeJoc);
+  Serial.print(":");
+  Serial.println(scorFinal);
+}
+
 void showGameOver() {
   display.clearDisplay();
   display.setTextSize(1);
@@ -448,8 +461,19 @@ void showGameOver() {
   
   display.display();
 
+  // Trimitem o singura data cand intram in ecranul de Game Over
+  if (!scoreSent) {
+    if (selectedGameIsTetris) {
+      trimiteScorLaESP("TETRIS", score);
+    } else {
+      trimiteScorLaESP("NFS", score);
+    }
+    scoreSent = true; 
+  }
+
   if (digitalRead(BTN_ROTATE) == LOW) {
     currentState = STATE_MENU;
+    scoreSent = false;
     delay(500);
   }
 }
